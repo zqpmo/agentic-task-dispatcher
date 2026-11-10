@@ -29,7 +29,7 @@ Semantic decisions (independent review outcomes, human acceptance, kill, model/p
 | Capability | Behavior |
 |---|---|
 | Dry-run by default | Write path is gated by CLI `--execute` (not by config JSON); without it the run does not write |
-| Contract checks A–E | Project–task relation, Run creation uniqueness, model/fallback events, gates, deliverable uniqueness |
+| Contract checks (batch) | Required fields, priority/executor/status validity, prerequisites, duplicate active Task ID, max retries, manual-decision gate, schedule time |
 | Content hashing | `computeTaskHash` for change detection on the task payload |
 | File lock (best effort) | Check-then-write lock with 5-minute TTL; second process exits `LOCKED`. **Not** an atomic/distributed mutex |
 | Cursor file | `state/cursor.json` is read each run; **save is not wired into the main pipeline yet** |
@@ -82,10 +82,10 @@ npm run reconcile
 | `npm run lint` | `tsc --noEmit` |
 | `npm run build` | Compile to `dist/` |
 | `npm run dev` | Run TS entry via `tsx` (pass flags after `--`) |
-| `npm run dry-run` | Control loop, no writes |
-| `npm run execute` | Control loop with writes |
-| `npm run once` | Single pass |
-| `npm run reconcile` | Reconciliation findings |
+| `npm run dry-run` | Control loop, no writes (default mode) |
+| `npm run execute` | Control loop with writes (`--execute`) |
+| `npm run once` | Accepted CLI flag (`--once`); currently a single process run (same as default entry) |
+| `npm run reconcile` | Full pipeline + reconciliation findings (**needs** `NOTION_API_KEY` and reachable Notion — not offline-only) |
 
 ## Configuration
 
