@@ -13,14 +13,14 @@
 High-token agent polling of a Notion-style task board is expensive and hard to audit. This controller replaces that loop with a **pure deterministic pipeline**:
 
 1. Load config JSON + read `NOTION_API_KEY` from the process environment
-2. Acquire a best-effort single-host file lock (creates `state/` on first run)
+2. Acquire a best-effort single-host file lock (creates `state/` and `logs/` on first run)
 3. Read a local cursor file (resume helper — see limitations)
 4. Query task candidates (DRAFT / waiting states)
 5. Run pure-function **contract checks**
 6. Write only mechanical fields (status transitions, hashes, run metadata)
-7. Verify writes
+7. Re-query tasks and run **spot-check assertions** (not a field-by-field write diff)
 8. Run **reconciliation** assertions
-9. Emit structured JSON logs
+9. Emit structured JSON logs (file + terminal)
 
 Semantic decisions (independent review outcomes, human acceptance, kill, model/provider choice) are **denylisted** — the controller never invents them.
 
@@ -34,6 +34,7 @@ Semantic decisions (independent review outcomes, human acceptance, kill, model/p
 | File lock (best effort) | Check-then-write lock with 5-minute TTL; second process exits `LOCKED`. **Not** an atomic/distributed mutex |
 | Cursor file | `state/cursor.json` is read each run; **save is not wired into the main pipeline yet** |
 | Reconciliation | Flags orphans, duplicate Run IDs, missing gates, baseline drift — suggests only, does not auto-fix business conclusions |
+| Post-write check | Re-queries tasks and asserts a few invariants (e.g. `RUNNING` has session/start time). **Does not** diff every written field against expectation |
 | Exit codes | `0` OK · `2` PARTIAL · `3` ERROR (deterministic/API) · `4` LOCKED |
 
 ### Known limitations (honest list)
@@ -44,6 +45,7 @@ Semantic decisions (independent review outcomes, human acceptance, kill, model/p
 - Setting `RUNNING` writes a **local placeholder** session URL (`127.0.0.1`); the controller does **not** spawn or confirm a real executor.
 - `saveCursor()` and `buildRunIdempotencyKey()` exist as helpers but are **not** fully wired into write/dedup paths.
 - `queryProjects` / `queryRecords` fetch at most one page (`page_size: 100`); large boards need pagination.
+- Post-write “verify” is a **re-query + spot assertions**, not per-field expected-vs-actual comparison.
 - Unit tests cover contract identifiers/batch keys only — not concurrency, API faults, or recovery.
 
 ## Quick start

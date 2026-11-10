@@ -1,11 +1,22 @@
-// Structured JSON logger for v3 Cron Controller
-import { writeFileSync, appendFileSync, existsSync } from 'fs';
+// Structured JSON logger for the deterministic task dispatcher
+import { appendFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { LogLevel } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOG_DIR = resolve(__dirname, '..', 'logs');
+
+function ensureLogDir(): boolean {
+  try {
+    if (!existsSync(LOG_DIR)) {
+      mkdirSync(LOG_DIR, { recursive: true });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export class Logger {
   private level: LogLevel;
@@ -14,9 +25,7 @@ export class Logger {
   constructor(level: LogLevel = LogLevel.INFO, logFile: string = 'controller.log') {
     this.level = level;
     this.logFile = logFile;
-    if (!existsSync(LOG_DIR)) {
-      // skip mkdir in pure function context
-    }
+    ensureLogDir();
   }
 
   log(level: LogLevel, message: string, data?: any) {
@@ -38,9 +47,18 @@ export class Logger {
     }
 
     try {
+      ensureLogDir();
       appendFileSync(resolve(LOG_DIR, this.logFile), line);
-    } catch {
-      // silent fail for log writes
+    } catch (e) {
+      // Terminal already has the line; file failure must not crash the run.
+      process.stderr.write(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: 'WARN',
+          message: 'log_file_write_failed',
+          error: String(e),
+        }) + '\n'
+      );
     }
   }
 

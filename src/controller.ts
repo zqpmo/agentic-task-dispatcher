@@ -8,7 +8,7 @@ import { computeTaskHash, buildRunIdempotencyKey, computeBaselineHash } from './
 import { createLogger } from './logger.js';
 import { RunContext, ExitCode, TaskProperties, ProjectProperties, RecordProperties, isTerminalStatus } from './types.js';
 import { v4 as uuidv4 } from 'uuid';
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -16,6 +16,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATE_DIR = resolve(__dirname, '..', 'state');
 const LOCK_FILE = resolve(STATE_DIR, 'lock.json');
 const CURSOR_FILE = resolve(STATE_DIR, 'cursor.json');
+const LOG_DIR = resolve(__dirname, '..', 'logs');
 
 // --- CLI args ---
 
@@ -359,12 +360,15 @@ async function step9_Reconcile(allTasks: TaskProperties[], projects: ProjectProp
     }
   }
 
-  // Write reconciliation report
-  const reportPath = resolve(__dirname, '..', 'logs', `reconcile-${new Date().toISOString().slice(0, 10)}.json`);
+  // Write reconciliation report (ensure logs/ exists on first run)
+  const reportPath = resolve(LOG_DIR, `reconcile-${new Date().toISOString().slice(0, 10)}.json`);
   try {
+    if (!existsSync(LOG_DIR)) {
+      mkdirSync(LOG_DIR, { recursive: true });
+    }
     writeFileSync(reportPath, JSON.stringify({ summary, findings }, null, 2));
-  } catch {
-    // silent
+  } catch (e) {
+    logger.warn('Reconcile report file write failed', { error: String(e), reportPath });
   }
 }
 
