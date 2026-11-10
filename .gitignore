@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+*.tsbuildinfo
+
+# Runtime state (locks, cursors, logs)
+state/
+logs/
+*.log
+.lock
+
+# Secrets & local config (copy from *.example.json)
+.env
+.env.*
+config/config.json
+
+# Test / tooling caches
+.pytest_cache/
+__pycache__/
+.vitest/
+coverage/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Backup / evidence dumps (never publish)
+_backup*/
+evidence/

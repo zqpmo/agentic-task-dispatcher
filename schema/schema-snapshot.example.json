@@ -1,0 +1,18 @@
+{
+  "note": "Minimal illustrative schema for the three-database task console. Replace with a snapshot of your own Notion data sources before relying on property names.",
+  "task_status_options": [
+    "DRAFT",
+    "WAITING_FOR_PRIMARY",
+    "WAITING_FOR_WORKER_A",
+    "WAITING_FOR_WORKER_B",
+    "NEEDS_USER",
+    "RUNNING",
+    "WAITING_FOR_NOTION_AI",
+    "DONE",
+    "CLOSED",
+    "KILLED",
+    "ERROR"
+  ],
+  "executor_options": ["Worker A", "Worker B", "Primary", "Notion AI", "user", "assistant"],
+  "record_types": ["Run", "Gate", "ModelEvent"]
+}

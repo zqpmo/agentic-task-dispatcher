@@ -1,0 +1,49 @@
+{
+  "notion": {
+    "data_sources": {
+      "tasks": "YOUR_TASK_DATABASE_ID",
+      "projects": "YOUR_PROJECT_DATABASE_ID",
+      "records": "YOUR_RECORD_DATABASE_ID"
+    },
+    "database_name": "Example Task Console"
+  },
+  "dispatcher": {
+    "interval_minutes": 5,
+    "max_candidates": 10,
+    "dry_run": true,
+    "log_file": "dispatcher.log"
+  },
+  "runner": {
+    "interval_minutes": 5,
+    "offset_minutes": 1,
+    "max_concurrent": 3,
+    "dry_run": true,
+    "log_file": "runner.log"
+  },
+  "concurrency": {
+    "hard_limit": 3,
+    "soft_limit": 2,
+    "third_slot_conditions": {
+      "parallel_mode_required": true,
+      "no_prerequisites": true,
+      "no_file_conflicts": true,
+      "no_p3_data": true,
+      "no_external_coder_if_running": true,
+      "short_duration_only": true
+    }
+  },
+  "task_types": {
+    "short": "short",
+    "regular": "regular",
+    "long": "long"
+  },
+  "statuses": {
+    "draft": "DRAFT",
+    "waiting_for_primary": "WAITING_FOR_PRIMARY",
+    "waiting_for_worker_a": "WAITING_FOR_WORKER_A",
+    "waiting_for_worker_b": "WAITING_FOR_WORKER_B",
+    "running": "RUNNING",
+    "waiting_for_notion_ai": "WAITING_FOR_NOTION_AI",
+    "needs_user": "NEEDS_USER"
+  }
+}
