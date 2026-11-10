@@ -23,7 +23,7 @@
     "idempotency",
     "workflow",
     "controller",
-    "agentic-pmo"
+    "task-dispatcher"
   ],
   "license": "MIT",
   "dependencies": {

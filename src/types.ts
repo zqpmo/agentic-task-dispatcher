@@ -1,4 +1,4 @@
-// Shared types for Agentic PMO v3 Cron Controller
+// Shared types for the deterministic multi-database task dispatcher
 
 export interface NotionConfig {
   data_sources: {

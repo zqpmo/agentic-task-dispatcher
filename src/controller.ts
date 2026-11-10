@@ -40,6 +40,11 @@ function parseArgs(): CliArgs {
 
 async function acquireLock(ctx: RunContext): Promise<boolean> {
   try {
+    // First-run safety: ensure state/ exists before writing lock/cursor files.
+    if (!existsSync(STATE_DIR)) {
+      const { mkdirSync } = await import('fs');
+      mkdirSync(STATE_DIR, { recursive: true });
+    }
     if (existsSync(LOCK_FILE)) {
       const lock = JSON.parse(readFileSync(LOCK_FILE, 'utf-8'));
       const age = Date.now() - new Date(lock.timestamp).getTime();
@@ -51,6 +56,8 @@ async function acquireLock(ctx: RunContext): Promise<boolean> {
     }
     // Lock payload deliberately holds no hostname / user / path info: it is only
     // used to detect a live second instance, run id + pid is sufficient.
+    // NOTE: check-then-write is not a true atomic lock (TOCTOU). Adequate for a
+    // single-host best-effort guard; not a distributed mutex.
     writeFileSync(LOCK_FILE, JSON.stringify({
       runId: ctx.runId,
       pid: process.pid,
@@ -361,7 +368,7 @@ async function step9_Reconcile(allTasks: TaskProperties[], projects: ProjectProp
   }
 }
 
-// --- 唯一 Dispatcher 领取入口（WAITING_FOR_PRIMARY → RUNNING，CAS + 幂等 + 终态保护） ---
+// --- Unique claim entry (WAITING_FOR_PRIMARY → RUNNING): optimistic check + terminal-state guard ---
 
 function selectClaimCandidates(allTasks: TaskProperties[]): TaskProperties[] {
   return allTasks
@@ -392,11 +399,11 @@ async function step6b_ClaimWaitingForPrimary(allTasks: TaskProperties[]) {
   const expectedVersion = task['版本号'] || 1;
   const client = getNotionClient(config);
 
-  // CAS：写入前回读，确认仍为 WAITING_FOR_PRIMARY 且版本号未变
+  // Optimistic check (NOT atomic CAS): re-read, confirm still WAITING_FOR_PRIMARY and version unchanged
   const reread = await queryAllTasks(client);
   const current = reread.find(t => t.id === task.id);
   if (!current || current['状态'] !== 'WAITING_FOR_PRIMARY' || (current['版本号'] || 1) !== expectedVersion) {
-    logger.warn('Step 6b: CAS failed, claim skipped', {
+    logger.warn('Step 6b: optimistic claim check failed, claim skipped', {
       taskId: task['Task ID'],
       currentStatus: current ? current['状态'] : 'MISSING',
       expectedVersion,
@@ -460,7 +467,7 @@ async function runSupervise(): Promise<number> {
   const blocked = findings.filter(f => f.status !== 'OK');
   const result = blocked.length > 0 ? 'BLOCKED' : 'OK';
   process.stdout.write(JSON.stringify({
-    supervisor: 'AR11B-v1',
+    supervisor: 'v1',
     checkedAt: new Date().toISOString(),
     runningCount: running.length,
     result,

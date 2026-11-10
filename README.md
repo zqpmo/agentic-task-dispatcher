@@ -1,8 +1,8 @@
 # agentic-task-dispatcher
 
-> 中文：多库任务的**确定性**编排控制器——契约检查、幂等写入、对账与默认 dry-run；语义判断留给人，机械路径可回放。
+> 中文：多库任务的**确定性**编排控制器——契约检查、对账与默认 dry-run；语义判断留给人，机械路径可回放。**架构原型**，接入真实库前请先在隔离环境验收。
 
-**Deterministic multi-database task dispatcher** for agentic workflows: contract checks, idempotent writes, reconciliation, and **dry-run by default**. No LLM calls in the control loop — semantic judgment stays with humans; mechanical paths stay replayable.
+**Deterministic multi-database task dispatcher** for agentic workflows: contract checks, reconciliation, and **dry-run by default**. No LLM calls in the control loop — semantic judgment stays with humans. **Architecture prototype** — validate on an isolated board before any production writes.
 
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
@@ -13,11 +13,11 @@
 High-token agent polling of a Notion-style task board is expensive and hard to audit. This controller replaces that loop with a **pure deterministic pipeline**:
 
 1. Load config JSON + read `NOTION_API_KEY` from the process environment
-2. Acquire a single-instance lock
-3. Resume from a cursor
+2. Acquire a best-effort single-host file lock (creates `state/` on first run)
+3. Read a local cursor file (resume helper — see limitations)
 4. Query task candidates (DRAFT / waiting states)
 5. Run pure-function **contract checks**
-6. Write only what the **write allowlist** permits (idempotent, optimistic lock)
+6. Write only mechanical fields (status transitions, hashes, run metadata)
 7. Verify writes
 8. Run **reconciliation** assertions
 9. Emit structured JSON logs
@@ -30,12 +30,21 @@ Semantic decisions (independent review outcomes, human acceptance, kill, model/p
 |---|---|
 | Dry-run by default | Write path is gated by CLI `--execute` (not by config JSON); without it the run does not write |
 | Contract checks A–E | Project–task relation, Run creation uniqueness, model/fallback events, gates, deliverable uniqueness |
-| Idempotency | Stable keys + hashes; duplicate webhooks do not create duplicate records |
-| Optimistic lock | Version mismatch stops overwrite and re-reads |
-| Single-instance lock | File lock with TTL; second process exits `LOCKED` |
-| Cursor resume | Tracks processed task URLs across runs |
+| Content hashing | `computeTaskHash` for change detection on the task payload |
+| File lock (best effort) | Check-then-write lock with 5-minute TTL; second process exits `LOCKED`. **Not** an atomic/distributed mutex |
+| Cursor file | `state/cursor.json` is read each run; **save is not wired into the main pipeline yet** |
 | Reconciliation | Flags orphans, duplicate Run IDs, missing gates, baseline drift — suggests only, does not auto-fix business conclusions |
 | Exit codes | `0` OK · `2` PARTIAL · `3` ERROR (deterministic/API) · `4` LOCKED |
+
+### Known limitations (honest list)
+
+- **Not a production scheduler.** Treat as an architecture prototype until claim/ack, concurrency, and recovery are proven on an isolated board.
+- File lock is **TOCTOU** (exists-check then write); fixed 5-minute TTL can expire during long runs.
+- Claim path is read-modify-write, **not** an atomic conditional update (despite older “CAS” wording in comments).
+- Setting `RUNNING` writes a **local placeholder** session URL (`127.0.0.1`); the controller does **not** spawn or confirm a real executor.
+- `saveCursor()` and `buildRunIdempotencyKey()` exist as helpers but are **not** fully wired into write/dedup paths.
+- `queryProjects` / `queryRecords` fetch at most one page (`page_size: 100`); large boards need pagination.
+- Unit tests cover contract identifiers/batch keys only — not concurrency, API faults, or recovery.
 
 ## Quick start
 
@@ -105,7 +114,7 @@ tests/
 
 ### Write allowlist vs denylist
 
-**Can write (mechanical):** hashes, version bumps, health status, drift markers, mechanical gate results, idempotent Run/Gate/Model Event records.
+**Can write (mechanical):** hashes, version numbers, health status, drift markers, mechanical gate results, Run/Gate/Model Event record fields as invoked by the controller. This is a **call-site convention**, not a central policy middleware on `updateTask`.
 
 **Must not write (semantic):** independent review results, manual acceptance, KILL decisions, model/provider selection, task → CLOSED, any human/AI judgment.
 
